@@ -41,7 +41,7 @@ Copy outputs from the session `images/` dir into
 |-------|-------|
 | Generate | `POST https://api.x.ai/v1/images/generations` |
 | Edit | `POST https://api.x.ai/v1/images/edits` |
-| Auth | `Authorization: Bearer $XAI_API_KEY` |
+| Auth | `Authorization: Bearer <token>` — OAuth access token or `XAI_API_KEY` |
 
 ### Generate body
 
@@ -124,9 +124,29 @@ Exit codes: `0` ok, `1` usage/config, `2` API error, `3` rate limited after retr
 
 ## Auth summary
 
+Resolved by `scripts/generate.sh` via `scripts/xai-auth.sh` (`XAI_AUTH=auto|oauth|api-key`, default `auto` = OAuth first, key fallback):
+
 | Environment | Auth |
 |-------------|------|
 | Grok Build tools | Logged-in session (no key export) |
-| Claude Code / CI / script | `XAI_API_KEY` from [console.x.ai](https://console.x.ai) |
+| SuperGrok / X Premium subscription | OAuth device-code flow (`xai-auth.sh login`), tokens in `~/.config/xai-oauth/tokens.json` |
+| Existing Hermes agent login | Auto-detected from `~/.hermes/auth.json` (`providers."xai-oauth"`); rotated refresh tokens are written back so Hermes stays valid |
+| Metered key | `XAI_API_KEY` from [console.x.ai](https://console.x.ai) |
 
-No OAuth client is embedded in this skill.
+### OAuth flow details (mirrors Hermes' `xai-oauth` provider)
+
+- Issuer `https://auth.x.ai`; device code `POST /oauth2/device/code`
+  (form-encoded `client_id` + `scope`); token endpoint from OIDC discovery.
+- Poll with `grant_type=urn:ietf:params:oauth:grant-type:device_code`;
+  handle `authorization_pending` / `slow_down`.
+- Access tokens are ~6h JWTs; refresh (form-encoded `grant_type=refresh_token`)
+  proactively 1h before `exp`. Refresh tokens may rotate — always persist the
+  returned pair.
+- The bearer token works on all `api.x.ai/v1` surfaces including image
+  generation/edits.
+- Caveat: xAI sometimes gates OAuth API access to specific SuperGrok tiers —
+  a 403 from the token or image endpoint with a valid login means
+  tier-blocked, not broken auth.
+
+`xai-auth.sh status` reports which sources are available without printing
+secrets; `xai-auth.sh token` emits a fresh access token for scripting.

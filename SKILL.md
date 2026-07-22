@@ -149,24 +149,33 @@ Never leave the only copy inside a session temp path.
 Priority:
 
 1. **Grok Build** with native `image_gen` / `image_edit` tools → use them
-2. Else **`XAI_API_KEY`** → REST (`scripts/generate.sh` or curl)
+2. Else REST via `scripts/generate.sh`, which resolves auth itself
+   (`XAI_AUTH=auto|oauth|api-key`, default `auto`):
+   1. **xAI OAuth** (SuperGrok / X Premium subscription — no API credits
+      needed): the skill's own store (`~/.config/xai-oauth/tokens.json`)
+      or a detected **Hermes agent** session (`~/.hermes/auth.json`).
+      Inspect with `scripts/xai-auth.sh status`; sign in with
+      `scripts/xai-auth.sh login` (browser device-code flow).
+   2. **`XAI_API_KEY`** → metered console.x.ai key as fallback.
 3. Else stop:
 
 ```
 No Grok Imagine backend available.
 
   • In Grok Build: image_gen should work without a key (session auth).
-  • Elsewhere: export XAI_API_KEY="xai-..."   # console.x.ai
+  • Subscription: scripts/xai-auth.sh login   # SuperGrok / X Premium OAuth
+  • Or metered:  export XAI_API_KEY="xai-..." # console.x.ai
 ```
 
 **Default model:** `grok-imagine-image-quality` (latest quality Imagine model).
 Do not use deprecated Flux aliases.
 
-Report immediately:
+Report immediately (generate.sh prints the resolved `auth:` source):
 
 ```
 Backend: Grok Imagine (image_gen tool) — model grok-imagine-image-quality
-Backend: Grok Imagine REST — model grok-imagine-image-quality
+Backend: Grok Imagine REST (oauth) — model grok-imagine-image-quality
+Backend: Grok Imagine REST (api-key) — model grok-imagine-image-quality
 ```
 
 Full API shapes: `./references/backends.md`.
@@ -413,7 +422,11 @@ Templates: `./references/style-templates.md`.
 ## Error handling
 
 - Missing content → ask
-- Missing `XAI_API_KEY` outside Grok Build → setup instructions
+- No auth outside Grok Build → offer `scripts/xai-auth.sh login` (subscription
+  OAuth) or `XAI_API_KEY` setup instructions
+- 403 on api-key → team has no console.x.ai credits; suggest the OAuth path
+- 403 on oauth → xAI may gate API access to specific SuperGrok tiers;
+  re-login won't help — suggest `XAI_API_KEY` or a subscription upgrade
 - Missing `jq` on REST path → `brew install jq`
 - Moderation block → report; do **not** rephrase to evade
 - 429 → wait, retry once, then stop batch with partial results

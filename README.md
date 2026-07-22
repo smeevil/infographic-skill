@@ -8,7 +8,7 @@ maps, and UI mockups — using **Grok Imagine** only.
 > browser diagrams, use a separate **visual-explainer** skill. This repo is for
 > **images**.
 
-**Version:** 0.2.0  
+**Version:** 0.3.0  
 **Default model:** `grok-imagine-image-quality`
 
 ## Origin
@@ -85,9 +85,13 @@ cp commands/infographic.md ~/.claude/commands/
 | Environment | Auth |
 |-------------|------|
 | **Grok Build** | Session tools `image_gen` / `image_edit` (no key export) |
-| **Claude Code / CLI** | `export XAI_API_KEY=...` from [console.x.ai](https://console.x.ai) |
+| **SuperGrok / X Premium** | `./scripts/xai-auth.sh login` — OAuth device-code flow, uses your subscription (no API credits) |
+| **Hermes agent users** | Auto-detected: an existing `~/.hermes/auth.json` xai-oauth session is reused as-is |
+| **Metered key** | `export XAI_API_KEY=...` from [console.x.ai](https://console.x.ai) |
 
-No OAuth client ships in this skill.
+`generate.sh` resolves auth automatically (`XAI_AUTH=auto|oauth|api-key`,
+default `auto` = OAuth first, key fallback). Check what's available with
+`./scripts/xai-auth.sh status`.
 
 ### REST helper
 
@@ -136,7 +140,8 @@ references/
   style-templates.md
   gallery-template.html
 scripts/
-  generate.sh            # REST generate + edit
+  generate.sh            # REST generate + edit (auth-resolving)
+  xai-auth.sh            # OAuth login / token / status / logout
 ```
 
 ## Related

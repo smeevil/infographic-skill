@@ -73,7 +73,31 @@ if [[ -z "${XAI_API_KEY:-}" ]]; then
   _load_env_file "${XAI_ENV_FILE:-}"
   _load_env_file "$HOME/.config/xai.env"
 fi
-[[ -n "${XAI_API_KEY:-}" ]] || die "XAI_API_KEY is not set"
+
+# Auth resolution — XAI_AUTH = auto (default) | oauth | api-key.
+# auto/oauth: prefer a subscription OAuth token (skill store or Hermes,
+# via xai-auth.sh); auto falls back to XAI_API_KEY when no OAuth session.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AUTH_MODE="${XAI_AUTH:-auto}"
+AUTH_TOKEN=""
+AUTH_SOURCE=""
+case "$AUTH_MODE" in
+  auto|oauth)
+    if AUTH_TOKEN=$("$SCRIPT_DIR/xai-auth.sh" token 2>/dev/null); then
+      AUTH_SOURCE="oauth"
+    elif [[ "$AUTH_MODE" == "oauth" ]]; then
+      die "XAI_AUTH=oauth but no OAuth session (run: xai-auth.sh login)"
+    fi
+    ;;
+  api-key) ;;
+  *) die "invalid XAI_AUTH: $AUTH_MODE (auto|oauth|api-key)" ;;
+esac
+if [[ -z "$AUTH_TOKEN" ]]; then
+  [[ -n "${XAI_API_KEY:-}" ]] || die "no xAI auth: run scripts/xai-auth.sh login (subscription) or set XAI_API_KEY"
+  AUTH_TOKEN="$XAI_API_KEY"
+  AUTH_SOURCE="api-key"
+fi
+echo "auth: $AUTH_SOURCE" >&2
 
 if [[ -n "$PROMPT_FILE" ]]; then
   [[ -f "$PROMPT_FILE" ]] || die "prompt file not found: $PROMPT_FILE"
@@ -140,12 +164,18 @@ attempt=0
 while true; do
   HTTP=$(curl -sS -o "$RESP" -w "%{http_code}" \
     -X POST "$ENDPOINT" \
-    -H "Authorization: Bearer $XAI_API_KEY" \
+    -H "Authorization: Bearer $AUTH_TOKEN" \
     -H "Content-Type: application/json" \
     -d "$BODY") || api_die "curl failed"
 
   if [[ "$HTTP" == "200" ]]; then
     break
+  fi
+  if [[ "$HTTP" == "403" ]]; then
+    if [[ "$AUTH_SOURCE" == "api-key" ]]; then
+      api_die "HTTP 403 — API key rejected (team may lack console.x.ai credits; try OAuth: scripts/xai-auth.sh login) — $(head -c 300 "$RESP")"
+    fi
+    api_die "HTTP 403 — OAuth token rejected (xAI may gate image API access to specific SuperGrok tiers) — $(head -c 300 "$RESP")"
   fi
   if [[ "$HTTP" == "429" && "$attempt" -lt "$MAX_RETRIES" ]]; then
     echo "rate limited (429); sleeping ${RETRY_SLEEP}s then retry…" >&2

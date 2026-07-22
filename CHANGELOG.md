@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.3.0 — 2026-07-22
+
+### Added
+
+- **xAI OAuth (subscription) auth** — `scripts/xai-auth.sh` implements the
+  SuperGrok / X Premium device-code flow against `auth.x.ai` (same client as
+  the open-source Hermes agent): `login`, `token` (auto-refresh, ~6h JWTs,
+  1h-early refresh), `status`, `logout`. Tokens stored in
+  `~/.config/xai-oauth/tokens.json` (0600).
+- **Existing-session detection** — reuses a Hermes agent login from
+  `~/.hermes/auth.json` (`providers."xai-oauth"`, incl. `credential_pool`
+  entries) when present; rotated refresh tokens are written back so the
+  Hermes session stays valid.
+- **Auth resolution in `generate.sh`** — `XAI_AUTH=auto|oauth|api-key`
+  (default `auto`: OAuth first, `XAI_API_KEY` fallback); prints the resolved
+  `auth:` source; targeted 403 hints (missing console credits vs
+  OAuth tier-gating).
+
 ## 0.2.0 — 2026-07-22
 
 Major rewrite. Hosted as [smeevil/infographic-skill](https://github.com/smeevil/infographic-skill).
